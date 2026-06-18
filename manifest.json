@@ -1,0 +1,11 @@
+{
+  "id": "OpenProviderDomains",
+  "type": "domain-registrar",
+  "name": "OpenProvider Domains",
+  "description": "Register, transfer, renew and manage domains through the OpenProvider REST API (v1beta). Supports availability checks, name server and contact updates, registrar lock, WHOIS privacy, EPP/auth code retrieval and a sandbox test mode.",
+  "version": "1.0.0",
+  "icon_url": "icon.svg",
+  "author": "OpenProviderDomains contributors",
+  "license": "Apache-2.0",
+  "minimum_fossbilling_version": "0.8.0"
+}
