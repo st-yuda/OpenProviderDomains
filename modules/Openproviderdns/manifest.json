@@ -1,0 +1,10 @@
+{
+  "id": "openproviderdns",
+  "type": "mod",
+  "name": "OpenProvider DNS",
+  "description": "Lets clients manage the DNS records (A, AAAA, CNAME, MX, TXT, ...) of the domains they registered through the OpenProvider registrar — for example to point a domain at an IP address. Requires the OpenProviderDomains registrar module.",
+  "icon_url": "icon.svg",
+  "version": "1.0.0",
+  "author": "OpenProviderDomains contributors",
+  "license": "Apache-2.0"
+}

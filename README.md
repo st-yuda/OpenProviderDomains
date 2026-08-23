@@ -16,6 +16,7 @@ tested against **FOSSBilling 0.8.x**.
 - **Registrar lock** (lock / unlock) and **WHOIS privacy** (enable / disable).
 - **EPP / auth code retrieval** and full domain-detail synchronisation (expiry date, lock state, privacy, name servers, contact).
 - **Sandbox support** — flip the registrar's *Test Mode* switch to talk to the OpenProvider sandbox instead of production.
+- **DNS record management (companion module)** — an included client-area module (`OpenProvider DNS`) lets your customers manage the DNS records of their OpenProvider domains (A, AAAA, CNAME, MX, TXT, …) — for example to point a domain at an IP address. See [DNS management](#dns-management-companion-module).
 
 ## How it differs from the old module
 
@@ -75,6 +76,46 @@ reliably on FOSSBilling 0.8.2:
 | Username   | Your OpenProvider account / reseller username.         |
 | Password   | Your OpenProvider account password.                    |
 | Test Mode  | When enabled, all requests go to the OpenProvider sandbox. Managed by FOSSBilling's standard per-registrar toggle. |
+
+## DNS management (companion module)
+
+The repository ships a second, optional FOSSBilling module — **OpenProvider DNS**
+(`modules/Openproviderdns/`) — that adds a client-area page where your customers
+manage the DNS zone of the domains they registered through OpenProvider. It
+reuses the registrar's credentials, so there is nothing extra to configure.
+
+**What it does**
+
+- Lists each client's active OpenProvider domains.
+- Shows the domain's DNS records and lets the client add, edit and delete
+  `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `SRV`, `CAA` and `ALIAS` records.
+- Creates the DNS zone automatically when the first record is added.
+- Every request is scoped to the logged-in client's own orders, so a client can
+  only ever touch the DNS of domains they own.
+
+**Installation**
+
+1. Copy `modules/Openproviderdns/` into your FOSSBilling `modules/` directory:
+
+   ```
+   <fossbilling>/modules/Openproviderdns/
+   ```
+
+2. In the admin panel go to **Extensions → Overview**, find **OpenProvider DNS**
+   and click **Activate**.
+
+3. Clients reach the DNS manager at **`/openproviderdns`**. Add a link to it from
+   your theme's client menu (or link to it from your domain management page) so
+   customers can find it.
+
+**Prerequisites** — for DNS edits to take effect, the domain must actually use
+OpenProvider's name servers (e.g. the `dns-openprovider` group / `ns1.openprovider.nl`…).
+If the domain points to another DNS provider (Cloudflare, etc.), changes made
+here have no effect. The registrar module registers new domains with
+OpenProvider's name servers by default when the customer supplies none.
+
+> The DNS module depends on the `OpenProviderDomains` registrar module being
+> installed (it reuses its API client and stored credentials).
 
 ## Notes & limitations
 

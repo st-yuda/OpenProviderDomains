@@ -1,0 +1,297 @@
+{% extends request.ajax ? "layout_blank.html.twig" : "layout_default.html.twig" %}
+{% set active_menu = 'order' %}
+
+{% block meta_title %}{{ 'DNS Management'|trans }}{% endblock %}
+{% block page_header %}{{ 'DNS Management'|trans }}{% endblock %}
+{% block body_class %}openproviderdns{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active" aria-current="page">{{ 'DNS Management'|trans }}</li>{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-header py-3">
+                <h1 class="mb-1">{{ 'DNS Management'|trans }}</h1>
+                <span class="mt-1 small text-secondary">{{ 'Manage the DNS records of your OpenProvider domains. For example, add an A record to point your domain to an IP address.'|trans }}</span>
+            </div>
+            <div class="card-body">
+                {% if domains is empty %}
+                    <div class="alert alert-info mb-0">{{ 'You have no active domains registered through OpenProvider.'|trans }}</div>
+                {% else %}
+                    <div class="mb-3" style="max-width: 420px;">
+                        <label for="opdns-domain" class="form-label">{{ 'Domain'|trans }}</label>
+                        <select class="form-select" id="opdns-domain">
+                            <option value="">{{ 'Select a domain...'|trans }}</option>
+                            {% for d in domains %}
+                                <option value="{{ d.order_id }}" data-domain="{{ d.domain }}">{{ d.domain }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="opdns-panel" style="display: none;">
+                        <hr>
+                        <h5 class="mb-3">{{ 'Add a record'|trans }}</h5>
+                        <form id="opdns-add-form" class="row g-2 align-items-end mb-4">
+                            <div class="col-md-3">
+                                <label class="form-label">{{ 'Name / Host'|trans }}</label>
+                                <input type="text" class="form-control" name="name" placeholder="@  {{ 'or e.g.'|trans }}  www">
+                                <div class="form-text">{{ 'Leave empty or use @ for the domain itself.'|trans }}</div>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">{{ 'Type'|trans }}</label>
+                                <select class="form-select" name="type" id="opdns-add-type">
+                                    {% for t in types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">{{ 'Value'|trans }}</label>
+                                <input type="text" class="form-control" name="value" placeholder="1.2.3.4" required>
+                            </div>
+                            <div class="col-md-1">
+                                <label class="form-label">{{ 'TTL'|trans }}</label>
+                                <input type="number" class="form-control" name="ttl" value="3600" min="60">
+                            </div>
+                            <div class="col-md-1 opdns-prio-wrap" style="display: none;">
+                                <label class="form-label">{{ 'Prio'|trans }}</label>
+                                <input type="number" class="form-control" name="prio" value="0" min="0">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary w-100">{{ 'Add record'|trans }}</button>
+                            </div>
+                        </form>
+
+                        <h5 class="mb-3">{{ 'Records'|trans }}</h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>{{ 'Name'|trans }}</th>
+                                        <th>{{ 'Type'|trans }}</th>
+                                        <th>{{ 'Value'|trans }}</th>
+                                        <th style="width: 90px;">{{ 'TTL'|trans }}</th>
+                                        <th style="width: 70px;">{{ 'Prio'|trans }}</th>
+                                        <th class="text-end" style="width: 150px;">{{ 'Actions'|trans }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="opdns-tbody"></tbody>
+                            </table>
+                        </div>
+                        <div id="opdns-empty" class="alert alert-info mt-3" style="display: none;">{{ 'This domain has no DNS records yet. Add one above.'|trans }}</div>
+                        <div id="opdns-loading" class="text-muted mt-3" style="display: none;">{{ 'Loading...'|trans }}</div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+(function () {
+    'use strict';
+
+    var TYPES = {{ types|json_encode|raw }};
+    var PRIO_TYPES = ['MX', 'SRV'];
+    var L = {
+        edit: '{{ 'Edit'|trans|e('js') }}',
+        del: '{{ 'Delete'|trans|e('js') }}',
+        save: '{{ 'Save'|trans|e('js') }}',
+        cancel: '{{ 'Cancel'|trans|e('js') }}',
+        confirmDelete: '{{ 'Delete this DNS record?'|trans|e('js') }}',
+        added: '{{ 'Record added'|trans|e('js') }}',
+        updated: '{{ 'Record updated'|trans|e('js') }}',
+        deleted: '{{ 'Record deleted'|trans|e('js') }}'
+    };
+
+    var domainSelect = document.getElementById('opdns-domain');
+    if (!domainSelect) {
+        return;
+    }
+    var panel = document.getElementById('opdns-panel');
+    var tbody = document.getElementById('opdns-tbody');
+    var emptyMsg = document.getElementById('opdns-empty');
+    var loading = document.getElementById('opdns-loading');
+    var addForm = document.getElementById('opdns-add-form');
+    var addType = document.getElementById('opdns-add-type');
+
+    var currentOrderId = null;
+
+    function usesPrio(type) {
+        return PRIO_TYPES.indexOf((type || '').toUpperCase()) !== -1;
+    }
+
+    function post(method, params, onSuccess, onError) {
+        FOSSBilling.api.client.post('openproviderdns/' + method, params, onSuccess, function (error) {
+            if (onError) { onError(error); }
+        });
+    }
+
+    function td(text) {
+        var cell = document.createElement('td');
+        cell.textContent = text;
+        return cell;
+    }
+
+    function makeInput(value, type, attrs) {
+        var input = document.createElement('input');
+        input.className = 'form-control form-control-sm';
+        input.type = type || 'text';
+        input.value = value;
+        Object.keys(attrs || {}).forEach(function (k) { input.setAttribute(k, attrs[k]); });
+        return input;
+    }
+
+    function makeTypeSelect(selected) {
+        var sel = document.createElement('select');
+        sel.className = 'form-select form-select-sm';
+        TYPES.forEach(function (t) {
+            var opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            if (t === selected) { opt.selected = true; }
+            sel.appendChild(opt);
+        });
+        return sel;
+    }
+
+    function displayRow(rec) {
+        var tr = document.createElement('tr');
+        tr.appendChild(td(rec.name));
+        tr.appendChild(td(rec.type));
+        tr.appendChild(td(rec.value));
+        tr.appendChild(td(rec.ttl));
+        tr.appendChild(td(usesPrio(rec.type) ? rec.prio : '-'));
+
+        var actions = document.createElement('td');
+        actions.className = 'text-end';
+
+        var editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-sm btn-outline-primary me-1';
+        editBtn.textContent = L.edit;
+        editBtn.addEventListener('click', function () { editRow(tr, rec); });
+
+        var delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-sm btn-outline-danger';
+        delBtn.textContent = L.del;
+        delBtn.addEventListener('click', function () {
+            if (!window.confirm(L.confirmDelete)) { return; }
+            delBtn.disabled = true;
+            var params = Object.assign({ order_id: currentOrderId }, rec);
+            post('record_delete', params, function () {
+                FOSSBilling.message(L.deleted);
+                loadRecords();
+            }, function () { delBtn.disabled = false; });
+        });
+
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+        tr.appendChild(actions);
+        return tr;
+    }
+
+    function editRow(tr, rec) {
+        var nameIn = makeInput(rec.name, 'text');
+        var typeSel = makeTypeSelect(rec.type);
+        var valueIn = makeInput(rec.value, 'text');
+        var ttlIn = makeInput(rec.ttl, 'number', { min: '60' });
+        var prioIn = makeInput(rec.prio, 'number', { min: '0' });
+
+        var cells = tr.children;
+        cells[0].textContent = ''; cells[0].appendChild(nameIn);
+        cells[1].textContent = ''; cells[1].appendChild(typeSel);
+        cells[2].textContent = ''; cells[2].appendChild(valueIn);
+        cells[3].textContent = ''; cells[3].appendChild(ttlIn);
+        cells[4].textContent = ''; cells[4].appendChild(prioIn);
+
+        var actions = cells[5];
+        actions.textContent = '';
+
+        var saveBtn = document.createElement('button');
+        saveBtn.className = 'btn btn-sm btn-primary me-1';
+        saveBtn.textContent = L.save;
+        saveBtn.addEventListener('click', function () {
+            saveBtn.disabled = true;
+            var params = {
+                order_id: currentOrderId,
+                original_name: rec.name, original_type: rec.type, original_value: rec.value,
+                original_ttl: rec.ttl, original_prio: rec.prio,
+                name: nameIn.value, type: typeSel.value, value: valueIn.value,
+                ttl: ttlIn.value, prio: prioIn.value
+            };
+            post('record_update', params, function () {
+                FOSSBilling.message(L.updated);
+                loadRecords();
+            }, function () { saveBtn.disabled = false; });
+        });
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-sm btn-outline-secondary';
+        cancelBtn.textContent = L.cancel;
+        cancelBtn.addEventListener('click', function () {
+            tr.replaceWith(displayRow(rec));
+        });
+
+        actions.appendChild(saveBtn);
+        actions.appendChild(cancelBtn);
+    }
+
+    function loadRecords() {
+        if (!currentOrderId) { return; }
+        tbody.textContent = '';
+        emptyMsg.style.display = 'none';
+        loading.style.display = '';
+        post('records', { order_id: currentOrderId }, function (result) {
+            loading.style.display = 'none';
+            var records = (result && result.records) || [];
+            if (!records.length) {
+                emptyMsg.style.display = '';
+                return;
+            }
+            records.forEach(function (rec) { tbody.appendChild(displayRow(rec)); });
+        }, function () {
+            loading.style.display = 'none';
+        });
+    }
+
+    domainSelect.addEventListener('change', function () {
+        currentOrderId = this.value || null;
+        if (!currentOrderId) {
+            panel.style.display = 'none';
+            return;
+        }
+        panel.style.display = '';
+        loadRecords();
+    });
+
+    function togglePrio() {
+        var wrap = addForm.querySelector('.opdns-prio-wrap');
+        wrap.style.display = usesPrio(addType.value) ? '' : 'none';
+    }
+    addType.addEventListener('change', togglePrio);
+    togglePrio();
+
+    addForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (!currentOrderId) { return; }
+        var btn = addForm.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        var params = {
+            order_id: currentOrderId,
+            name: addForm.name.value,
+            type: addForm.type.value,
+            value: addForm.value.value,
+            ttl: addForm.ttl.value,
+            prio: addForm.prio ? addForm.prio.value : 0
+        };
+        post('record_add', params, function () {
+            FOSSBilling.message(L.added);
+            addForm.reset();
+            togglePrio();
+            btn.disabled = false;
+            loadRecords();
+        }, function () { btn.disabled = false; });
+    });
+})();
+</script>
+{% endblock %}
