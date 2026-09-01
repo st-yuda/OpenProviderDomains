@@ -49,15 +49,18 @@ class Service implements \FOSSBilling\InjectionAwareInterface
      *
      * @return list<array{order_id: int, domain: string}>
      */
-    public function getClientDomains(\Model_Client $client): array
+    public function getClientDomains($client): array
     {
+        // 'domain'/'active' are used as literals rather than class constants:
+        // Model_ProductTable was removed in newer FOSSBilling releases, and the
+        // values are stable across versions.
         $orders = $this->di['db']->find(
             'ClientOrder',
             'client_id = :cid AND service_type = :stype AND status = :status ORDER BY id DESC',
             [
                 ':cid' => $client->id,
-                ':stype' => \Model_ProductTable::DOMAIN,
-                ':status' => \Model_ClientOrder::STATUS_ACTIVE,
+                ':stype' => 'domain',
+                ':status' => 'active',
             ]
         );
 

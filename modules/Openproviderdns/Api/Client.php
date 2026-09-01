@@ -14,7 +14,17 @@ declare(strict_types=1);
 
 namespace Box\Mod\Openproviderdns\Api;
 
-class Client extends \Api_Abstract
+/*
+ * Cross-version compatibility: FOSSBilling renamed the client/admin API base
+ * class from the global `Api_Abstract` (0.8.2 and earlier) to
+ * `\FOSSBilling\Api\AbstractApi` (0.8.3+). Alias the historical name onto the
+ * new one so this module runs on both without change.
+ */
+if (!class_exists(\FOSSBilling\Api\AbstractApi::class) && class_exists('Api_Abstract')) {
+    class_alias('Api_Abstract', \FOSSBilling\Api\AbstractApi::class);
+}
+
+class Client extends \FOSSBilling\Api\AbstractApi
 {
     /**
      * List the current client's OpenProvider domains.
@@ -117,7 +127,7 @@ class Client extends \Api_Abstract
         }
 
         $service = $orderService->getOrderService($order);
-        if (!$service instanceof \Model_ServiceDomain || $order->status !== \Model_ClientOrder::STATUS_ACTIVE) {
+        if (!$service instanceof \Model_ServiceDomain || $order->status !== 'active') {
             throw new \FOSSBilling\InformationException('Domain order is not active');
         }
 
