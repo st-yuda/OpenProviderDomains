@@ -31,6 +31,7 @@ class Registrar_Adapter_OpenProviderDomains extends Registrar_AdapterAbstract
     public array $config = [
         'username' => null,
         'password' => null,
+        'delete_at_registrar' => null,
     ];
 
     private ?Registrar_Adapter_OpenProviderDomains_Api $api = null;
@@ -50,6 +51,11 @@ class Registrar_Adapter_OpenProviderDomains extends Registrar_AdapterAbstract
             $this->config['password'] = $options['password'];
         } else {
             throw new Registrar_Exception('The ":domain_registrar" domain registrar is not fully configured. Please configure the :missing.', [':domain_registrar' => 'OpenProvider', ':missing' => 'OpenProvider password'], 3001);
+        }
+
+        // Optional. Defaults to the safe behaviour (never delete the real domain).
+        if (isset($options['delete_at_registrar'])) {
+            $this->config['delete_at_registrar'] = $options['delete_at_registrar'];
         }
     }
 
@@ -81,6 +87,16 @@ class Registrar_Adapter_OpenProviderDomains extends Registrar_AdapterAbstract
                         'description' => 'The password of your OpenProvider account.',
                         'required' => true,
                         'renderPassword' => true,
+                    ],
+                ],
+                'delete_at_registrar' => [
+                    'radio', [
+                        'label' => 'When a domain order is cancelled or deleted',
+                        'description' => 'Cancelling or deleting a domain order in FOSSBilling should normally **not** delete the actual domain at OpenProvider — the domain stays registered and safe. Only choose to delete the domain at OpenProvider if you are absolutely sure; this is irreversible. Leaving this unset keeps the domain (the safe default).',
+                        'multiOptions' => [
+                            'keep' => 'Keep the domain registered at OpenProvider (recommended)',
+                            'delete' => 'Delete the domain at OpenProvider (dangerous, irreversible)',
+                        ],
                     ],
                 ],
             ],
@@ -178,6 +194,21 @@ class Registrar_Adapter_OpenProviderDomains extends Registrar_AdapterAbstract
 
     public function deleteDomain(Registrar_Domain $domain): bool
     {
+        // Safety guard: FOSSBilling calls this when a domain order is cancelled
+        // or deleted (action_cancel -> action_delete). Removing a billing order
+        // must NOT delete the customer's actual domain — it stays registered at
+        // OpenProvider. Real deletion only happens when the registrar is
+        // explicitly configured for it. We still return true so the order is
+        // removed locally without error.
+        if (($this->config['delete_at_registrar'] ?? '') !== 'delete') {
+            $this->getLog()->info(sprintf(
+                'OpenProvider: domain "%s" was kept at the registrar; the FOSSBilling order was removed locally only. Set "Delete the domain at OpenProvider" in the registrar settings to change this.',
+                $domain->getName()
+            ));
+
+            return true;
+        }
+
         $id = $this->_getDomainId($domain);
 
         $this->_api()->call('DELETE', "/domains/{$id}");

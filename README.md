@@ -75,7 +75,22 @@ reliably on FOSSBilling 0.8.2:
 |------------|--------------------------------------------------------|
 | Username   | Your OpenProvider account / reseller username.         |
 | Password   | Your OpenProvider account password.                    |
+| When a domain order is cancelled or deleted | Whether removing a domain order in FOSSBilling should also delete the real domain at OpenProvider. Defaults to **keeping** the domain (safe). See [Domain deletion safety](#domain-deletion-safety). |
 | Test Mode  | When enabled, all requests go to the OpenProvider sandbox. Managed by FOSSBilling's standard per-registrar toggle. |
+
+## Domain deletion safety
+
+When you **cancel** or **delete** a domain order in FOSSBilling, the platform
+calls the registrar's `deleteDomain()` (cancelling an order, and deleting one,
+both trigger it). By default this module **does not** delete the actual domain
+at OpenProvider — it only lets FOSSBilling remove the local order, and the
+domain stays registered and safe. An informational note is written to the
+FOSSBilling logs each time this happens.
+
+If you genuinely want removing an order to also delete the domain at OpenProvider
+(irreversible), set **"When a domain order is cancelled or deleted"** to
+*"Delete the domain at OpenProvider"* in the registrar settings. Leaving it unset
+keeps the domain, which is the recommended, safe default.
 
 ## DNS management (companion module)
 
