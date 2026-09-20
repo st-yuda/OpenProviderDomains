@@ -32,7 +32,8 @@ reliably on FOSSBilling 0.8.2:
 
 ## Requirements
 
-- FOSSBilling 0.8.0 or newer (PHP 8.3+).
+- FOSSBilling 0.8.x (PHP 8.3+). Tested against 0.8.2 through 0.8.6; the code
+  adapts automatically to the API base-class rename introduced in 0.8.3.
 - An OpenProvider account with API access.
 
 ## Installation
@@ -152,6 +153,33 @@ OpenProvider's name servers by default when the customer supplies none.
   passed straight through from OpenProvider. Authentication problems usually
   mean the username/password are wrong or the account lacks API access.
 - Enable FOSSBilling's debug logging to see each request the adapter makes.
+- **`Class "Api_Abstract" not found`** — you are on FOSSBilling 0.8.3 or newer,
+  which renamed the API base class. This module handles that automatically, so
+  make sure the `modules/Openproviderdns/` files are up to date.
+
+## Changelog
+
+### 1.1.0
+
+- **Domain deletion safety** — cancelling or deleting a domain order no longer
+  deletes the real domain at OpenProvider by default. The order is removed
+  locally and the domain stays registered. A registrar setting lets you opt in
+  to registrar-side deletion. See [Domain deletion safety](#domain-deletion-safety).
+- **FOSSBilling 0.8.3–0.8.6 compatibility** — the DNS module now works on
+  releases that renamed the API base class (`Api_Abstract` →
+  `\FOSSBilling\Api\AbstractApi`) and removed `Model_ProductTable`, while
+  staying compatible with 0.8.2.
+- **OpenProvider DNS module** — new optional client-area module
+  (`modules/Openproviderdns/`) to manage DNS records (A, AAAA, CNAME, MX, TXT,
+  NS, SRV, CAA, ALIAS) of OpenProvider domains, e.g. to point a domain at an IP.
+
+### 1.0.0
+
+- Initial release: OpenProvider registrar adapter (availability & transfer
+  checks, register, transfer, renew, delete, name servers, contacts, registrar
+  lock, WHOIS privacy, EPP/auth code, domain-detail sync) built on the
+  OpenProvider REST API (v1beta), with sandbox support via the registrar Test
+  Mode toggle.
 
 ## License
 
